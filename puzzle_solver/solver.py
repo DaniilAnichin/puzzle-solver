@@ -25,6 +25,7 @@ def fit_at(border_shape: Shape, tile: np.array, x: int, y: int) -> np.array:
 def solve_puzzle(border: np.array, tiles: list[np.array], positions: list = None) -> list[list[Shape]]:
     if not tiles:
         yield positions
+        return
 
     if not positions:
         positions = []
