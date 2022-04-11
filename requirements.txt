@@ -1,2 +1,5 @@
 click
 numpy
+
+opencv-python
+imutils
