@@ -1,3 +1,4 @@
+import json
 from pprint import pprint
 
 import click
@@ -14,11 +15,23 @@ def prepare_window():
     cv2.moveWindow('cv2', 50, 50)
 
 
+def window_exists() -> bool:
+    try:
+        if cv2.getWindowProperty('cv2', cv2.WND_PROP_VISIBLE) < 1:
+            return False
+    except:
+        return False
+    return True
+
+
 def imshow(img, title: str = 'Shape'):
+    if not window_exists():
+        prepare_window()
+
     cv2.setWindowTitle('cv2', title)
     cv2.imshow('cv2', img)
     while True:
-        if cv2.getWindowProperty('cv2', cv2.WND_PROP_VISIBLE) < 1:
+        if not window_exists():
             break
 
         if cv2.waitKey(100) == 27:
@@ -56,26 +69,6 @@ def smooth(mask, debug: bool = False):
             axis=0,
         ), 'Masks')
     return mask
-
-
-def sharpen(img):
-    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l_channel, a, b = cv2.split(lab)
-
-    # Applying CLAHE to L-channel
-    # feel free to try different values for the limit and grid size:
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l_channel)
-
-    # merge the CLAHE enhanced L-channel with the a and b channel
-    limg = cv2.merge((cl, a, b))
-
-    # Converting image from LAB Color model to BGR color spcae
-    enhanced_img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
-
-    # Stacking the original image with the enhanced image
-    # np.hstack((img, enhanced_img))
-    return enhanced_img
 
 
 def crop(*images, offset=0, with_position=False):
@@ -191,14 +184,33 @@ def separate_tiles(img, tiles_mask, tilemap_area, debug=False):
     return shapes, colours
 
 
+def mask_to_image(mask, scale=20):
+    small_img = cv2.cvtColor(mask.astype(np.uint8), cv2.COLOR_GRAY2RGB)
+    return imutils.resize(small_img, width=small_img.shape[0] * scale)
+
+
+def draw_solution(
+        border,
+        sorted_tiles,
+        sorted_colours,
+        solution,
+):
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    img_result = mask_to_image(-border * 255)
+    for colour, tile, position in zip(sorted_colours, sorted_tiles, solution):
+        pad_tile = solver.fit_at(border.shape, tile, *position)
+        colored_tile = mask_to_image(pad_tile) * colour
+        tile_with_border = cv2.erode(colored_tile, kernel)
+        img_result += tile_with_border
+
+    imshow(img_result, 'Solution result:')
+
+
 @click.command()
 @click.option('-i', '--image', required=True, help='Screenshot location', type=click.Path())
 @click.option('-t', '--tile-offset', required=False, help='Tile color offset', type=click.INT, default=10)
 def main(image: str, tile_offset: int):
     img = cv2.imread(image, flags=-1)
-    # img = sharpen(img)
-    cv2.destroyAllWindows()
-    prepare_window()
 
     tilemap_mask = get_tilemap_mask(img)
     cropped_tilemap_mask, tilemap_position = crop(tilemap_mask, with_position=True)
@@ -216,46 +228,44 @@ def main(image: str, tile_offset: int):
     cropped_tiles_mask, img_tiles = crop(tiles_mask, bottom, offset=5)
     cropped_tiles_mask = cv2.bitwise_not(cropped_tiles_mask)
 
-    # print(np.histogram(tiles_mask_inv, bins=2))
-    # imshow(cv2.bitwise_and(img_tiles, img_tiles, mask=(tiles_mask_inv // 2) + 120), title='Tiles masked')
-    # img_tiles[cropped_tiles_mask > 0] //= 2
-    # imshow(img_tiles, title='Tiles masked')
-    img_tiles_2 = np.copy(img_tiles)
-
     smooth_mask = smooth(cropped_tiles_mask, debug=False)
     # Crop #2
     final_mask, img_tiles_final = crop(smooth_mask, img_tiles)
 
-    tiles, colours = separate_tiles(img_tiles_final, final_mask, area, debug=False)
+    tiles, colours = separate_tiles(img_tiles_final, final_mask, area, debug=True)
 
-    # smooth_mask = cropped_tiles_mask
-    # img_tiles_2[smooth_mask > 0] //= 2
-    # imshow(img_tiles_2, delay=3, title='Tiles masked, smooth')
-
-    # imshow(cropped_tiles_mask, title='Tiles mask')
-
+    print('Area: ', area)
+    print('Tiles area: ', sum(np.sum(tile) for tile in tiles))
     cv2.destroyAllWindows()
     cv2.waitKey(1)
+    return
 
     print('Starting to solve;')
-    initial_tile_positions, sorted_tiles = zip(*sorted(
-        enumerate(tiles),
+    sorted_colours, sorted_tiles = zip(*sorted(
+        zip(colours, tiles),
         key=lambda x: np.sum(x[1]),  # Shape's area
         reverse=True,
     ))
 
-    result = list(solver.solve_puzzle(
-        border,
-        sorted_tiles,
-    ))
+    # solutions = list(solver.solve_puzzle(
+    #     border,
+    #     sorted_tiles,
+    # ))
 
-    # for i, solution in enumerate(solve_puzzle(border, prepared_tiles), start=1):
-    #     print(f'Solution {i}:')
-    #     for tile, position in zip(sorted_tiles, solution):
-    #         print(f'{tile[0]},{tile[1]}: {position[0]},{position[1]}')
-    #     print()
+    with open('./assets/rect.solution.json') as out:
+        solutions = json.load(out)
+    if solutions:
+        # with open('./assets/rect.solution.json', mode='wt') as out:
+        #     json.dump(solutions, out, default=lambda x: list(x) if isinstance(x, tuple) else x)
+        solution = solutions[0]
+        draw_solution(border, sorted_tiles, sorted_colours, solution)
+    else:
+        print('No solution found(')
 
-    pprint(result)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+
+    # pprint(solutions)
 
 
 if __name__ == '__main__':
