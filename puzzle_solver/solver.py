@@ -29,6 +29,7 @@ def solve_puzzle(border: np.array, tiles: list[np.array], positions: list = None
 
     if not positions:
         positions = []
+
     x, y = border.shape
     for i, j in itertools.product(range(x), range(y)):
         if border[i, j] != -1:

@@ -1,5 +1,5 @@
 click
 numpy
 
-opencv-python
+opencv-python~=4.6
 imutils
