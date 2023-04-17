@@ -32,16 +32,18 @@ def solve_puzzle(border: np.array, tiles: list[np.array], positions: list = None
 
     x, y = border.shape
     for i, j in itertools.product(range(x), range(y)):
-        if border[i, j] != -1:
+        first_tile, *other_tiles = tiles
+
+        if first_tile[0, 0] == 1 and border[i, j] != -1:
             continue
 
-        tile_x, tile_y = tiles[0].shape
+        tile_x, tile_y = first_tile.shape
         if tile_x + i > x or tile_y + j > y:
             continue
 
-        fit_attempt = border + fit_at(border.shape, tiles[0], i, j)
+        fit_attempt = border + fit_at(border.shape, first_tile, i, j)
         if 1 not in fit_attempt:
-            yield from solve_puzzle(fit_attempt, tiles[1:], positions + [(i, j)])
+            yield from solve_puzzle(fit_attempt, other_tiles, positions + [(i, j)])
 
 
 def prepare_border():
