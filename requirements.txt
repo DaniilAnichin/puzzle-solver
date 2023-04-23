@@ -3,3 +3,5 @@ numpy
 
 opencv-python~=4.6
 imutils
+
+python-telegram-bot[ext,job-queue]~=20.0

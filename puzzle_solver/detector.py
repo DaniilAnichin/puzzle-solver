@@ -1,4 +1,4 @@
-import json
+from io import BytesIO
 from pprint import pprint
 
 import click
@@ -13,6 +13,16 @@ def prepare_window():
     cv2.namedWindow('cv2', flags=cv2.WINDOW_NORMAL)
     cv2.resizeWindow('cv2', 1200, 700)
     cv2.moveWindow('cv2', 50, 50)
+
+
+def get_opencv_img_from_buffer(buffer, flags):
+    bytes_as_np_array = np.frombuffer(buffer.read(), dtype=np.uint8)
+    return cv2.imdecode(bytes_as_np_array, flags)
+
+
+def get_buffer_from_opencv_img(img):
+    is_success, buffer = cv2.imencode(".jpg", img)
+    return BytesIO(buffer)
 
 
 def window_exists() -> bool:
@@ -235,14 +245,10 @@ def draw_solution(
         tile_with_border = cv2.erode(colored_tile, kernel)
         img_result += tile_with_border
 
-    imshow(img_result, 'Solution result:')
+    return img_result
 
 
-@click.command()
-@click.option('-i', '--image', required=True, help='Screenshot location', type=click.Path())
-def main(image: str):
-    img = cv2.imread(image, flags=-1)
-
+def detect_n_solve(img):
     tilemap_mask = get_tilemap_mask(img)
     cropped_tilemap_mask, tilemap_position = crop(tilemap_mask, with_position=True)
     smol_tilemap_mask = get_shape(cropped_tilemap_mask)
@@ -283,8 +289,21 @@ def main(image: str):
 
     try:
         solution = next(solutions_iter)
-        draw_solution(border, sorted_tiles, sorted_colors, solution)
+        return draw_solution(border, sorted_tiles, sorted_colors, solution)
     except StopIteration:
+        return None
+
+
+@click.command()
+@click.option('-i', '--image', required=True, help='Screenshot location', type=click.Path())
+def main(image: str):
+    with open(image, 'rb') as out:
+        img = get_opencv_img_from_buffer(out, flags=-1)
+
+    img_solution = detect_n_solve(img)
+    if img_solution is not None:
+        imshow(img_solution, 'Solution result:')
+    else:
         print('No solution found(')
 
     cv2.destroyAllWindows()
