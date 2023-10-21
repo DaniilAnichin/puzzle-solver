@@ -1,5 +1,4 @@
 from io import BytesIO
-from pprint import pprint
 
 import click
 import cv2
@@ -217,7 +216,10 @@ def separate_tiles(img, tiles_mask, tilemap_area, debug=False):
 
     if debug:
         # print(len(contours))
-        pprint(shapes)
+        for i, shape in enumerate(shapes):
+            print(f'Shape #{i}:')
+            solver.print_tile(shape)
+        # pprint(shapes)
         # print(colors)
         imshow(img, title='Contours')
     return shapes, colors
@@ -248,10 +250,12 @@ def draw_solution(
     return img_result
 
 
-def detect_n_solve(img):
+def detect_n_solve(img, debug):
     tilemap_mask = get_tilemap_mask(img)
     cropped_tilemap_mask, tilemap_position = crop(tilemap_mask, with_position=True)
     smol_tilemap_mask = get_shape(cropped_tilemap_mask)
+    if debug:
+        solver.print_tile(smol_tilemap_mask)
     area = np.sum(smol_tilemap_mask)
     border = -smol_tilemap_mask
     # Tilemap generation ends here
@@ -267,10 +271,10 @@ def detect_n_solve(img):
     bordered_tiles_mask = cv2.bitwise_xor(cropped_tiles_mask, border_mask)
 
     # Smooth, crop #2
-    smooth_mask = smooth(bordered_tiles_mask, debug=False)
+    smooth_mask = smooth(bordered_tiles_mask, debug=debug)
     final_mask, img_tiles_final = crop(smooth_mask, img_tiles)
 
-    tiles, colors = separate_tiles(img_tiles_final, final_mask, area, debug=False)
+    tiles, colors = separate_tiles(img_tiles_final, final_mask, area, debug=debug)
 
     print('Area: ', area)
     print('Tiles area: ', sum(np.sum(tile) for tile in tiles))
@@ -296,11 +300,12 @@ def detect_n_solve(img):
 
 @click.command()
 @click.option('-i', '--image', required=True, help='Screenshot location', type=click.Path())
-def main(image: str):
+@click.option('--debug/--no-debug', default=False)
+def main(image: str, debug: bool):
     with open(image, 'rb') as out:
         img = get_opencv_img_from_buffer(out, flags=-1)
 
-    img_solution = detect_n_solve(img)
+    img_solution = detect_n_solve(img, debug)
     if img_solution is not None:
         imshow(img_solution, 'Solution result:')
     else:

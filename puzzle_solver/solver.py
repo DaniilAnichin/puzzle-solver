@@ -5,6 +5,8 @@ import numpy as np
 
 
 Shape = tuple[int, int]
+last_attempts = 0
+total_attempts = 0
 
 
 def make_tile(shape: Shape) -> np.array:
@@ -22,13 +24,34 @@ def fit_at(border_shape: Shape, tile: np.array, x: int, y: int) -> np.array:
     ), mode='constant')
 
 
+def print_tile(tile: np.array):
+    block = '\u2588' * 2
+    space = ' ' * 2
+    for row in tile:
+        print(''.join([block if el else space for el in row]))
+
+
 def solve_puzzle(border: np.array, tiles: list[np.array], positions: list = None) -> list[list[Shape]]:
-    if not tiles:
-        yield positions
-        return
+    global last_attempts
+    global total_attempts
 
     if not positions:
         positions = []
+        last_attempts = 0
+        total_attempts = 0
+
+    total_attempts += 1
+    if not total_attempts % 1000:
+        print(f'Made {total_attempts} total attempts to fit tile..')
+
+    if len(tiles) == 1:
+        last_attempts += 1
+        if not last_attempts % 100:
+            print(f'Made {last_attempts} attempts to fit last tile..')
+
+    if not tiles:
+        yield positions
+        return
 
     x, y = border.shape
     for i, j in itertools.product(range(x), range(y)):
@@ -55,7 +78,7 @@ def prepare_border():
     ]
     for tile in fixed_tiles:
         border += tile
-    pprint(border)
+    print_tile(border)
     return border
 
 

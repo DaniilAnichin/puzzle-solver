@@ -50,8 +50,11 @@ async def fallback(update: Update, context: ext.ContextTypes.DEFAULT_TYPE):
 async def solve(update: Update, context: ext.ContextTypes.DEFAULT_TYPE):
     logger.info('Running `solve` with user=%s', update.effective_message.from_user.username)
     attachment = update.effective_message.effective_attachment
+    if isinstance(attachment, list):
+        photo = await attachment[-1].get_file()
+    else:
+        photo = await attachment.get_file()
 
-    photo = await attachment[-1].get_file()
     with NamedTemporaryFile('wb+') as out:
         await photo.download_to_memory(out)
         out.seek(0)
@@ -87,6 +90,7 @@ def main():
     app.add_handler(ext.CommandHandler('start', start))
     app.add_handler(ext.CommandHandler('help', help))
     app.add_handler(ext.MessageHandler(ext.filters.PHOTO, solve))
+    app.add_handler(ext.MessageHandler(ext.filters.Document.IMAGE, solve))
     app.add_handler(ext.MessageHandler(ext.filters.ALL, fallback))
     app.run_polling()
 
